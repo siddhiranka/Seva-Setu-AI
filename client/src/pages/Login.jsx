@@ -45,15 +45,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-8 shadow-xl space-y-6">
+    <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-sky-50 via-blue-50 to-white">
+      <div className="w-full max-w-md bg-white border border-sky-200 rounded-3xl p-8 shadow-xl shadow-sky-100 space-y-6">
         
-        {/* Title */}
         <div className="text-center space-y-2">
-          <h2 className="font-display font-extrabold text-3xl text-slate-800 dark:text-white">
+          <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-3">
+            <FiLock className="w-7 h-7" />
+          </div>
+          <h2 className="font-display font-extrabold text-3xl text-slate-800">
             Welcome Back
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-500">
             Sign in to access Seva Setu AI government assistants
           </p>
         </div>
@@ -69,11 +71,11 @@ const Login = () => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-sky-600 uppercase tracking-wider block">
               Email Address
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sky-400">
                 <FiMail />
               </span>
               <input
@@ -82,18 +84,18 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="yourname@gmail.com"
                 autoComplete="username"
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-750 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary text-sm transition-all"
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-sky-200 bg-sky-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 text-sm transition-all"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-sky-600 uppercase tracking-wider block">
               Password
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sky-400">
                 <FiLock />
               </span>
               <input
@@ -102,7 +104,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 autoComplete="current-password"
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-750 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary text-sm transition-all"
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-sky-200 bg-sky-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 text-sm transition-all"
                 required
               />
             </div>
@@ -117,12 +119,11 @@ const Login = () => {
           </button>
         </form>
 
-        {/* Redirect */}
-        <div className="text-center text-sm text-slate-500 dark:text-slate-400 pt-2">
+        <div className="text-center text-sm text-slate-500 pt-2">
           New to Seva Setu?{' '}
           <Link
             to={`/register?redirect=${redirect}`}
-            className="font-bold text-primary dark:text-saffron hover:underline"
+            className="font-bold text-sky-600 hover:text-sky-700 hover:underline"
           >
             Create Account
           </Link>

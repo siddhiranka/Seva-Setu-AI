@@ -32,17 +32,24 @@ const Navbar = () => {
     setIsOpen(false);
   };
 
-  const navLinks = [
+  const allNavLinks = [
     { path: user ? '/dashboard' : '/', label: t.navHome },
-    ...(user ? [
-      { path: '/chat', label: t.navChat },
-      { path: '/documents', label: t.navDocuments },
-      { path: '/complaint', label: t.navComplaints },
-      { path: '/schemes', label: t.navSchemes },
-      { path: '/profile', label: t.navProfile }
-    ] : []),
+    { path: '/chat', label: t.navChat, requiresAuth: true },
+    { path: '/documents', label: t.navDocuments, requiresAuth: true },
+    { path: '/complaint', label: t.navComplaints, requiresAuth: true },
+    { path: '/schemes', label: t.navSchemes, requiresAuth: true },
+    { path: '/profile', label: t.navProfile, requiresAuth: true },
     { path: '#about', label: t.navAbout || 'About', onClick: (e) => { e.preventDefault(); setShowAbout(true); } }
   ];
+
+  const handleNavClick = (e, link) => {
+    if (link.onClick) { link.onClick(e); return; }
+    if (link.requiresAuth && !user) {
+      e.preventDefault();
+      navigate('/login');
+      setIsOpen(false);
+    }
+  };
 
   return (
     <>
@@ -72,20 +79,25 @@ const Navbar = () => {
 
             {/* Center: Navigation Links */}
             <div className="hidden lg:flex items-center gap-1 xl:gap-1.5 flex-1 justify-center px-2 sm:px-4">
-              {navLinks.map((link) => {
+              {allNavLinks.map((link) => {
                 const isActive = location.pathname === link.path;
+                const locked = link.requiresAuth && !user;
                 return (
                   <Link
                     key={link.path}
-                    to={link.onClick ? '#' : link.path}
-                    onClick={link.onClick}
+                    to={link.onClick ? '#' : (locked ? '#' : link.path)}
+                    onClick={(e) => handleNavClick(e, link)}
                     className={`px-3 py-2 text-xs xl:text-sm font-bold transition-all relative after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:h-0.5 after:w-2/3 after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:scale-x-100 whitespace-nowrap ${
                       isActive
                         ? 'text-primary bg-primary-light/50 rounded-xl'
+                        : locked
+                        ? 'text-slate-400 hover:text-primary cursor-pointer'
                         : 'text-slate-600 hover:text-primary'
                     }`}
+                    title={locked ? 'Sign in to access' : undefined}
                   >
                     {link.label}
+                    {locked && <span className="ml-1 text-[9px] align-super opacity-60">🔒</span>}
                   </Link>
                 );
               })}
@@ -149,25 +161,26 @@ const Navbar = () => {
         {/* Mobile Menu */}
         {isOpen && (
           <div className="lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/50 py-4 px-6 space-y-3 shadow-2xl">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.onClick ? '#' : link.path}
-                onClick={(e) => {
-                  if (link.onClick) {
-                    link.onClick(e);
-                  }
-                  setIsOpen(false);
-                }}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-base font-bold ${
-                  location.pathname === link.path
-                    ? 'text-primary bg-primary-light'
-                    : 'text-slate-700 hover:text-primary'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {allNavLinks.map((link) => {
+              const locked = link.requiresAuth && !user;
+              return (
+                <Link
+                  key={link.path}
+                  to={link.onClick ? '#' : (locked ? '#' : link.path)}
+                  onClick={(e) => { handleNavClick(e, link); setIsOpen(false); }}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-base font-bold ${
+                    location.pathname === link.path
+                      ? 'text-primary bg-primary-light'
+                      : locked
+                      ? 'text-slate-400'
+                      : 'text-slate-700 hover:text-primary'
+                  }`}
+                >
+                  {link.label}
+                  {locked && <span className="ml-auto text-xs opacity-50">🔒</span>}
+                </Link>
+              );
+            })}
 
             <div className="pt-4 border-t border-slate-200/50 space-y-4">
               <div className="flex justify-between items-center">
