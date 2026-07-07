@@ -88,6 +88,9 @@ export const useSpeech = () => {
     }
   };
 
+  // Ref to signal mid-playback stop requests
+  const stopFlagRef = useRef(false);
+
   const speak = async (text, langOverride, callback) => {
     if (!synthRef.current) return;
 
@@ -98,23 +101,27 @@ export const useSpeech = () => {
 
     const speakLang = langOverride || language || 'en';
 
-    synthRef.current.cancel(); // cancel any active speaking
+    // Signal any running speech to stop, then cancel current audio
+    stopFlagRef.current = true;
+    synthRef.current.cancel();
+    await new Promise(r => setTimeout(r, 120)); // wait for cancel to propagate
+    stopFlagRef.current = false;
+
     setIsSpeaking(true);
 
-    // Filter markdown symbols out
+    // Clean markdown/special chars
     const cleanText = text
-      .replace(/[*#_`~]/g, '')
-      .replace(/\[.*?\]\(.*?\)/g, '')
-      .replace(/-\s+/g, '')
+      .replace(/#{1,6}\s/g, '')      // headings
+      .replace(/\*\*(.*?)\*\*/g, '$1') // bold
+      .replace(/\*(.*?)\*/g, '$1')     // italic
+      .replace(/`{1,3}[^`]*`{1,3}/g, '') // code
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links → label only
+      .replace(/^[-•]\s+/gm, '')      // bullet points
+      .replace(/\n{2,}/g, '. ')       // double newlines → pause
+      .replace(/\n/g, ' ')
       .trim();
 
-    // Split text into sentences cleanly
-    const sentences = cleanText
-      .split(/[.!?।\n]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
-    if (sentences.length === 0) {
+    if (!cleanText) {
       setIsSpeaking(false);
       if (callback) callback();
       return;
@@ -124,95 +131,104 @@ export const useSpeech = () => {
     let voices = synthRef.current.getVoices();
     if (voices.length === 0) {
       await new Promise((resolve) => {
-        const handler = () => {
-          voices = synthRef.current.getVoices();
-          resolve();
-        };
+        const handler = () => { voices = synthRef.current.getVoices(); resolve(); };
         window.speechSynthesis.addEventListener('voiceschanged', handler, { once: true });
-        setTimeout(resolve, 200); // 200ms fallback timeout
+        setTimeout(resolve, 300);
       });
     }
 
-    let currentIdx = 0;
-
-    const speakSentence = () => {
-      // Check if user stopped it in the meantime
-      if (!synthRef.current || !window.speechSynthesis.speaking && currentIdx > 0) {
-        setIsSpeaking(false);
-        return;
-      }
-
-      if (currentIdx >= sentences.length) {
-        setIsSpeaking(false);
-        if (callback) callback();
-        return;
-      }
-
-      const sentenceText = sentences[currentIdx];
-      const utterance = new SpeechSynthesisUtterance(sentenceText);
-      
-      // Explicitly configure volume, pitch, and rate for natural voice output
-      utterance.volume = 1.0; 
-      utterance.rate = 0.95; 
-      utterance.pitch = 1.0;
-      
+    // Pick best voice for the language
+    const getVoice = () => {
       if (speakLang === 'hi') {
-        utterance.lang = 'hi-IN';
+        return (
+          voices.find(v => v.lang.startsWith('hi') && v.name.includes('Google')) ||
+          voices.find(v => v.lang.startsWith('hi') && v.name.includes('Microsoft')) ||
+          voices.find(v => v.lang.startsWith('hi'))
+        );
       } else if (speakLang === 'mr') {
-        utterance.lang = 'mr-IN';
+        return (
+          voices.find(v => v.lang.startsWith('mr') && v.name.includes('Google')) ||
+          voices.find(v => v.lang.startsWith('mr') && v.name.includes('Microsoft')) ||
+          voices.find(v => v.lang.startsWith('mr'))
+        );
       } else {
-        utterance.lang = 'en-IN';
+        return (
+          voices.find(v => v.lang === 'en-IN' && v.name.includes('Google')) ||
+          voices.find(v => v.lang === 'en-GB' && v.name.includes('Google')) ||
+          voices.find(v => v.lang === 'en-US' && v.name.includes('Google')) ||
+          voices.find(v => v.lang.startsWith('en-IN')) ||
+          voices.find(v => v.lang.startsWith('en'))
+        );
       }
-
-      // Try setting a high quality language specific voice
-      let targetVoice = null;
-      if (speakLang === 'hi') {
-        targetVoice = voices.find(v => v.lang.startsWith('hi') && (v.name.includes('Google') || v.name.includes('Microsoft') || v.name.includes('Natural')));
-        if (!targetVoice) targetVoice = voices.find(v => v.lang.startsWith('hi'));
-      } else if (speakLang === 'mr') {
-        targetVoice = voices.find(v => v.lang.startsWith('mr') && (v.name.includes('Google') || v.name.includes('Microsoft') || v.name.includes('Natural')));
-        if (!targetVoice) targetVoice = voices.find(v => v.lang.startsWith('mr'));
-      } else {
-        targetVoice = voices.find(v => (v.lang.startsWith('en-IN') || v.lang.startsWith('en-GB') || v.lang.startsWith('en-US')) && (v.name.includes('Google') || v.name.includes('Microsoft') || v.name.includes('Natural')));
-        if (!targetVoice) targetVoice = voices.find(v => v.lang.startsWith('en'));
-      }
-
-      if (targetVoice) {
-        utterance.voice = targetVoice;
-      }
-
-      utterance.onend = () => {
-        currentIdx++;
-        // Small delay between sentences for natural flow
-        setTimeout(speakSentence, 60);
-      };
-
-      utterance.onerror = (err) => {
-        console.error('Speech synthesis sentence error:', err);
-        currentIdx++;
-        setTimeout(speakSentence, 60);
-      };
-
-      synthRef.current.speak(utterance);
     };
 
-    // Small delay to bypass Chromium cancel-speak race conditions
-    setTimeout(() => {
-      speakSentence();
-    }, 80);
+    // Split into chunks of ~200 chars at sentence boundaries to avoid Chrome's ~32KB limit
+    const chunks = [];
+    const sentences = cleanText.split(/(?<=[.!?।])\s+/);
+    let current = '';
+    for (const s of sentences) {
+      if ((current + ' ' + s).length > 200 && current.length > 0) {
+        chunks.push(current.trim());
+        current = s;
+      } else {
+        current = current ? current + ' ' + s : s;
+      }
+    }
+    if (current.trim()) chunks.push(current.trim());
+
+    const targetVoice = getVoice();
+
+    // Speak each chunk sequentially using promises
+    for (let i = 0; i < chunks.length; i++) {
+      if (stopFlagRef.current) break; // user pressed stop
+
+      const chunk = chunks[i];
+      await new Promise((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(chunk);
+        utterance.volume = 1.0;
+        utterance.rate = 0.92;
+        utterance.pitch = 1.0;
+
+        if (speakLang === 'hi') utterance.lang = 'hi-IN';
+        else if (speakLang === 'mr') utterance.lang = 'mr-IN';
+        else utterance.lang = 'en-IN';
+
+        if (targetVoice) utterance.voice = targetVoice;
+
+        utterance.onend = () => resolve();
+        utterance.onerror = (e) => {
+          // 'interrupted' fires when cancelled on purpose — don't retry
+          if (e.error !== 'interrupted') {
+            console.warn('TTS chunk error:', e.error);
+          }
+          resolve();
+        };
+
+        synthRef.current.speak(utterance);
+      });
+
+      // Small natural pause between chunks
+      if (!stopFlagRef.current && i < chunks.length - 1) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    setIsSpeaking(false);
+    if (!stopFlagRef.current && callback) callback();
   };
 
   const stopSpeaking = () => {
+    stopFlagRef.current = true;
     if (synthRef.current) {
       synthRef.current.cancel();
-      setIsSpeaking(false);
     }
+    setIsSpeaking(false);
   };
 
   const unlock = () => {
     if (synthRef.current) {
       try {
-        const u = new SpeechSynthesisUtterance('');
+        const u = new SpeechSynthesisUtterance(' ');
         u.volume = 0;
         u.rate = 1;
         synthRef.current.speak(u);
