@@ -76,9 +76,7 @@ const Landing = () => {
       stopListening();
     } else {
       startListening((transcript) => {
-        setSearchVal(transcript);
-        const dest = user ? '/chat' : '/login?redirect=chat';
-        navigate(`${dest}${dest.includes('?') ? '&' : '?'}query=${encodeURIComponent(transcript)}`);
+        setSearchVal(transcript); // just paste into box, user clicks arrow to send
       });
     }
   };
@@ -98,11 +96,11 @@ const Landing = () => {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-24 pb-20 max-w-6xl mx-auto"
+      className="space-y-20 pb-16 max-w-6xl mx-auto"
     >
       
       {/* Hero Section */}
-      <section className="min-h-[85vh] flex flex-col lg:flex-row items-center justify-between gap-12 pt-8 lg:pt-16 pb-12 relative z-10">
+      <section className="flex flex-col lg:flex-row items-center justify-between gap-10 pt-4 lg:pt-8 pb-4 relative z-10">
         
         {/* Left Column: AI Interface */}
         <motion.div

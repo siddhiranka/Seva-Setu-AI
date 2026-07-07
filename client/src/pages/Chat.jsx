@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import useSpeech from '../hooks/useSpeech';
 import ChatBox from '../components/ChatBox';
 import api from '../services/api';
-import { FiSend, FiPaperclip, FiMic, FiMicOff, FiAlertCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiMic, FiMicOff, FiAlertCircle, FiPlus, FiTrash2, FiVolume2, FiVolumeX } from 'react-icons/fi';
 
 const Chat = () => {
   const { t, language } = useLanguage();
@@ -27,6 +27,8 @@ const Chat = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
+  // Auto-speak toggle: true = AI reads response aloud, false = silent
+  const [autoSpeak, setAutoSpeak] = useState(true);
 
   const chatEndRef = useRef(null);
 
@@ -94,8 +96,10 @@ const Chat = () => {
 
       const savedChat = response.data;
       setChats(prev => prev.filter(c => c._id !== tempUserMsg._id).concat(savedChat));
-      speak(savedChat.response, savedChat.language);
-      
+      // Only read aloud if autoSpeak is on
+      if (autoSpeak) {
+        speak(savedChat.response, savedChat.language);
+      }
       // Update history sidebar
       setHistory(prev => [savedChat, ...prev]);
     } catch (err) {
@@ -107,12 +111,13 @@ const Chat = () => {
     }
   };
 
+  // Mic button: fills input with transcript, does NOT auto-send
   const handleVoiceInput = () => {
     if (isListening) {
       stopListening();
     } else {
       startListening((transcript) => {
-        handleSend(transcript);
+        setInputText(transcript); // paste into input box only
       });
     }
   };
@@ -199,14 +204,32 @@ const Chat = () => {
               </p>
             </div>
           </div>
-          {isSpeaking && (
+          {/* Right controls: Speaker toggle + Stop speaking */}
+          <div className="flex items-center gap-2">
+            {/* Auto-speak toggle */}
             <button
-              onClick={stopSpeaking}
-              className="px-3 py-1 rounded-xl text-[10px] font-bold bg-danger/10 border border-danger/20 text-danger hover:bg-danger/20 transition-all animate-pulse"
+              onClick={() => { setAutoSpeak(v => !v); if (isSpeaking) stopSpeaking(); }}
+              title={autoSpeak ? 'AI voice ON – click to mute' : 'AI voice OFF – click to enable'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all ${
+                autoSpeak
+                  ? 'bg-primary-light/60 border-primary/30 text-primary hover:bg-primary-light'
+                  : 'bg-slate-100 border-slate-200 text-slate-400 hover:bg-slate-200'
+              }`}
             >
-              {t.stopSpeaking}
+              {autoSpeak ? <FiVolume2 className="w-3.5 h-3.5" /> : <FiVolumeX className="w-3.5 h-3.5" />}
+              <span>{autoSpeak ? 'Voice On' : 'Voice Off'}</span>
             </button>
-          )}
+
+            {/* Stop speaking (only visible while speaking) */}
+            {isSpeaking && (
+              <button
+                onClick={stopSpeaking}
+                className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-danger/10 border border-danger/20 text-danger hover:bg-danger/20 transition-all animate-pulse"
+              >
+                {t.stopSpeaking}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Error notification */}
@@ -258,12 +281,12 @@ const Chat = () => {
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask anything about government services..."
+              placeholder={isListening ? '🎙 Listening... speak now' : 'Ask anything about government services...'}
               className="flex-1 bg-transparent border-none focus:outline-none text-sm text-slate-800 font-bold px-1"
-              disabled={isListening || isTyping}
+              disabled={isTyping}
             />
 
-            {/* Microphone inside input */}
+            {/* Microphone inside input — pastes speech into box, user presses Send manually */}
             <button
               type="button"
               onClick={handleVoiceInput}
@@ -273,14 +296,16 @@ const Chat = () => {
                   ? 'bg-red-500 text-white border-red-500 animate-pulse scale-110 shadow-md shadow-red-500/25'
                   : 'text-slate-400 border-transparent hover:bg-sky-50'
               }`}
-              title="Voice Input"
+              title={isListening ? 'Stop listening' : 'Click to speak'}
             >
-              <FiMic className={`w-4.5 h-4.5 ${isListening ? 'animate-bounce' : ''}`} />
+              {isListening
+                ? <FiMicOff className="w-4.5 h-4.5" />
+                : <FiMic className="w-4.5 h-4.5" />}
             </button>
 
             <button
               type="submit"
-              disabled={isListening || isTyping || !inputText.trim()}
+              disabled={isTyping || !inputText.trim()}
               className="p-2 bg-primary hover:bg-emerald-700 text-white rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               title="Send Prompt"
             >
